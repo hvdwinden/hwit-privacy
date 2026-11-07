@@ -2,4 +2,4 @@
 
 Openbare privacyverklaringen voor de apps van hw-it, gepubliceerd via GitHub Pages.
 
-- [Op weg naar 5K](https://hvdwinden.github.io/hwit-privacy/op-weg-naar-5k/)
+- [HUH – Half Uurtje Hollen](https://hvdwinden.github.io/hwit-privacy/huh/)
