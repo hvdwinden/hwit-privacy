@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="nl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+<title>HUH · hardlooprondje</title>
+<!--
+  De deelpagina van HUH (nl.hwit.huh). De route staat helemaal in de link, na het #-teken: dat deel
+  stuurt de browser niet naar deze server. Opbouw: 1.taal.start.meters.seconden.titel.route
+  (zie deellink.js in de app). Bron: tools/deelpagina in de HUH-repo.
+-->
+<link rel="stylesheet" href="leaflet/leaflet.min.css">
+<link rel="stylesheet" href="fonts/fonts.css">
+<style>
+html,body{margin:0;height:100%;font-family:Figtree,system-ui,sans-serif;background:#e9e4da}
+#map{position:absolute;inset:0}
+.card{position:absolute;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:500;max-width:460px;margin:0 auto;
+  background:#fbf8f2;color:#10141a;border-radius:22px;padding:16px 18px 12px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+.top{display:flex;justify-content:space-between;font:700 11px/1 Figtree,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#6b6f78}
+.top b{color:#ff4a1c}
+h1{font:800 30px/1 'Big Shoulders Display',sans-serif;text-transform:uppercase;margin:8px 0 12px;overflow-wrap:anywhere}
+.facts{display:flex;justify-content:space-between;border-top:1px solid rgba(0,0,0,.1);padding-top:12px}
+.facts span{font:600 12px/1.2 Figtree,sans-serif;color:#6b6f78}
+.facts b{display:block;font:900 30px/1 'Big Shoulders Display',sans-serif;color:#10141a}
+.btns{display:flex;gap:8px;margin-top:14px}
+.btns a{flex:1;text-align:center;text-decoration:none;font:800 15px/1 'Big Shoulders Display',sans-serif;letter-spacing:.06em;text-transform:uppercase;
+  padding:13px 6px;border-radius:99px;background:#ff4a1c;color:#fff}
+.btns a.g{background:rgba(16,20,26,.08);color:#10141a}
+.foot{margin-top:10px;font:500 11px/1.3 Figtree,sans-serif;color:#8a8e96;text-align:center}
+.attr{position:absolute;top:calc(6px + env(safe-area-inset-top));right:8px;z-index:500;font:500 10px/1 Figtree,sans-serif;background:rgba(255,255,255,.75);padding:3px 6px;border-radius:6px}
+.attr a{color:#444}
+.bad h1{margin-bottom:6px}
+.facts i{font-style:normal}
+</style></head>
+<body>
+<div id="map"></div>
+<div class="attr">© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a></div>
+<div class="card" id="card">
+  <div class="top"><span id="date"></span><b>HUH</b></div>
+  <h1 id="title"></h1>
+  <div class="facts"><span><b id="km"></b><i data-t="km">km</i></span><span><b id="time"></b><i data-t="time">tijd</i></span><span><b id="pace"></b><i data-t="pace">min/km</i></span></div>
+  <div class="btns">
+    <a id="gpx" class="g" download="route.gpx">GPX</a>
+    <a id="gmaps" class="g" target="_blank" rel="noopener">Google Maps</a>
+    <a id="huh" href="https://play.google.com/store/apps/details?id=nl.hwit.huh" target="_blank" rel="noopener" data-t="try">Probeer HUH</a>
+  </div>
+  <div class="foot" data-t="foot">Gelopen met HUH, de hardloopcoach. De route staat alleen in deze link, niet op een server. Begin en eind zijn weggelaten.</div>
+</div>
+<script src="leaflet/leaflet.min.js"></script>
+<script>
+'use strict';
+const TXT = {
+  nl: { time: 'tijd', pace: 'min/km', km: 'km', try: 'Probeer HUH', bad: 'Deze link is niet compleet',
+        badSub: 'Misschien is hij bij het kopiëren afgebroken. Vraag de afzender om hem opnieuw te delen.',
+        foot: 'Gelopen met HUH, de hardloopcoach. De route staat alleen in deze link, niet op een server. Begin en eind zijn weggelaten.' },
+  en: { time: 'time', pace: 'min/km', km: 'km', try: 'Try HUH', bad: 'This link is incomplete',
+        badSub: 'It may have been cut off when copying. Ask the sender to share it again.',
+        foot: 'Run with HUH, the running coach. The route lives only in this link, not on a server. Start and end are left out.' },
+};
+const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+
+function polyline(s) {
+  const out = []; let i = 0, la = 0, lo = 0;
+  while (i < s.length) {
+    for (let k = 0; k < 2; k++) {
+      let r = 0, sh = 0, b;
+      do {
+        b = B64.indexOf(s[i++]);
+        if (b < 0) throw new Error('teken');
+        r |= (b & 31) << sh; sh += 5;
+      } while (b >= 32);
+      const v = r & 1 ? ~(r >> 1) : r >> 1;
+      if (k) lo += v; else la += v;
+    }
+    out.push([la / 1e5, lo / 1e5]);
+  }
+  return out;
+}
+function text(b64) {
+  const bin = atob(b64.replace(/-/g, '+').replace(/_/g, '/'));
+  return new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
+}
+const clock = (s) => { s = Math.round(s); const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, x = String(s % 60).padStart(2, '0');
+  return h ? `${h}:${String(m).padStart(2, '0')}:${x}` : `${m}:${x}`; };
+const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+let lang = (navigator.language || 'nl').startsWith('nl') ? 'nl' : 'en';
+const map = L.map('map', { zoomControl: false, attributionControl: false });
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+try {
+  const p = location.hash.slice(1).split('.');
+  if (p[0] !== '1' || p.length !== 7) throw new Error('opbouw');
+  if (p[1] === 'nl' || p[1] === 'en') lang = p[1];
+  const start = parseInt(p[2], 36) * 1000, dist = +p[3], dur = +p[4], name = text(p[5]), pts = polyline(p[6]);
+  if (!(pts.length >= 2) || !(dist > 0) || !(dur > 0)) throw new Error('leeg');
+  const loc = lang === 'nl' ? 'nl-NL' : 'en-GB', dec = (n) => n.toLocaleString(loc, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const d = new Date(start);
+  document.getElementById('date').textContent = `${d.toLocaleDateString(loc, { weekday: 'short', day: 'numeric', month: 'short', year: d.getFullYear() === new Date().getFullYear() ? undefined : 'numeric' })} · ${d.toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit' })}`;
+  document.getElementById('title').textContent = name;
+  document.title = `${name} · HUH`;
+  document.getElementById('km').textContent = dec(dist / 1000);
+  document.getElementById('time').textContent = clock(dur);
+  document.getElementById('pace').textContent = clock(dur / (dist / 1000));
+  const line = L.polyline(pts, { color: '#ff4a1c', weight: 6, opacity: 0.95, lineCap: 'round', lineJoin: 'round' }).addTo(map);
+  L.circleMarker(pts[0], { radius: 7, color: '#ff4a1c', weight: 3, fillColor: '#fff', fillOpacity: 1 }).addTo(map);
+  L.circleMarker(pts[pts.length - 1], { radius: 7, color: '#fff', weight: 3, fillColor: '#10141a', fillOpacity: 1 }).addTo(map);
+  const fit = () => map.fitBounds(line.getBounds(), { paddingTopLeft: [24, 40], paddingBottomRight: [24, document.getElementById('card').offsetHeight + 40] });
+  fit(); addEventListener('resize', fit);
+  const mid = pts[Math.floor(pts.length / 2)];
+  document.getElementById('gmaps').href = `https://www.google.com/maps/search/?api=1&query=${mid[0]},${mid[1]}`;
+  const gpx = `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="HUH" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>${esc(name)}</name><trkseg>${
+    pts.map(([a, o]) => `<trkpt lat="${a}" lon="${o}"/>`).join('')}</trkseg></trk></gpx>\n`;
+  const gl = document.getElementById('gpx');
+  gl.href = URL.createObjectURL(new Blob([gpx], { type: 'application/gpx+xml' }));
+  gl.download = `${name.replace(/[^\p{L}0-9 _-]/gu, '').trim() || 'route'}.gpx`;
+} catch (e) {
+  map.setView([52.1, 5.3], 7);
+  const c = document.getElementById('card');
+  c.classList.add('bad');
+  c.innerHTML = `<div class="top"><span></span><b>HUH</b></div><h1>${TXT[lang].bad}</h1><div class="foot" style="text-align:left;font-size:14px">${TXT[lang].badSub}</div>
+    <div class="btns"><a href="https://play.google.com/store/apps/details?id=nl.hwit.huh">${TXT[lang].try}</a></div>`;
+}
+document.documentElement.lang = lang;
+document.querySelectorAll('[data-t]').forEach((el) => { el.textContent = TXT[lang][el.dataset.t]; });
+</script>
+</body></html>
