@@ -41,7 +41,6 @@ h1{font:800 30px/1 'Big Shoulders Display',sans-serif;text-transform:uppercase;m
   <div class="facts"><span><b id="km"></b><i data-t="km">km</i></span><span><b id="time"></b><i data-t="time">tijd</i></span><span><b id="pace"></b><i data-t="pace">min/km</i></span></div>
   <div class="btns">
     <a id="gpx" class="g" download="route.gpx">GPX</a>
-    <a id="gmaps" class="g" target="_blank" rel="noopener">Google Maps</a>
     <a id="huh" href="https://play.google.com/store/apps/details?id=nl.hwit.huh" target="_blank" rel="noopener" data-t="try">Probeer HUH</a>
   </div>
   <div class="foot" data-t="foot">Gelopen met HUH, de hardloopcoach. De route staat alleen in deze link, niet op een server. Begin en eind zijn weggelaten.</div>
@@ -106,8 +105,6 @@ try {
   L.circleMarker(pts[pts.length - 1], { radius: 7, color: '#fff', weight: 3, fillColor: '#10141a', fillOpacity: 1 }).addTo(map);
   const fit = () => map.fitBounds(line.getBounds(), { paddingTopLeft: [24, 40], paddingBottomRight: [24, document.getElementById('card').offsetHeight + 40] });
   fit(); addEventListener('resize', fit);
-  const mid = pts[Math.floor(pts.length / 2)];
-  document.getElementById('gmaps').href = `https://www.google.com/maps/search/?api=1&query=${mid[0]},${mid[1]}`;
   const gpx = `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="HUH" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>${esc(name)}</name><trkseg>${
     pts.map(([a, o]) => `<trkpt lat="${a}" lon="${o}"/>`).join('')}</trkseg></trk></gpx>\n`;
   const gl = document.getElementById('gpx');
